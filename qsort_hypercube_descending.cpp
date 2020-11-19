@@ -11,7 +11,7 @@
 #define MAX_LIST_SIZE_PER_PROC	268435456
 
 #ifndef VERBOSE
-#define VERBOSE 0			// Use VERBOSE to control output 
+#define VERBOSE 3			// Use VERBOSE to control output 
 #endif
 
 int compare_int(const void *, const void *);
@@ -308,20 +308,20 @@ void HyperCube_Class::HyperCube_QuickSort() {
 	//   list[idx ... list_size-1] <= pivot
 	idx = split_list_index(list, list_size, pivot);
 
-	list_size_leq = idx;
-	list_size_gt = list_size - idx;
+	list_size_gt = idx;
+	list_size_leq = list_size - idx;
 
 	// Communicate with neighbor along dimension k
 	nbr_k = neighbor_along_dim_k(k); 
 
 	if (nbr_k > my_id) {
-	    // MPI-2: Send number of elements greater than pivot
+	    // MPI-2: Send number of elements less than or equal to pivot
 
 	    // ***** Add MPI call here *****
-	    MPI_Send(&list_size_gt, 1, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
+	    MPI_Send(&list_size_leq, 1, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
 
 
-	    // MPI-3: Receive number of elements less than or equal to pivot
+	    // MPI-3: Receive number of elements greater than pivot
 
 	    // ***** Add MPI call here *****
 	    MPI_Recv(&nbr_list_size, 1, MPI_INT, nbr_k, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -332,34 +332,34 @@ void HyperCube_Class::HyperCube_QuickSort() {
 	    // MPI-4: Send list[idx ... list_size-1] to neighbor
 
 	    // ***** Add MPI call here *****
-	    MPI_Send(&list[idx], list_size_gt, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
+	    MPI_Send(&list[idx], list_size_leq, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
 
 
-	    // MPI-5: Receive neighbor's list of elements that are less than or equal to pivot
+	    // MPI-5: Receive neighbor's list of elements that are greater than pivot
 
 	    // ***** Add MPI call here *****
 	    MPI_Recv(nbr_list, nbr_list_size, MPI_INT, nbr_k, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 
-	    // Merge local list of elements less than or equal to pivot with neighbor's list
+	    // Merge local list of elements greater than pivot with neighbor's list
 	    new_list = merged_list(list, idx, nbr_list, nbr_list_size); 
 
 	    // Replace local list with new_list, update size
 	    delete [] list; 
 	    delete [] nbr_list; 
 	    list = new_list; 
-	    list_size = list_size_leq+nbr_list_size;
+	    list_size = list_size_gt+nbr_list_size;
 
 	} else {
-	    // MPI-6: Receive number of elements greater than pivot
+	    // MPI-6: Receive number of elements less than or equal to pivot
 
 	    // ***** Add MPI call here *****
 	    MPI_Recv(&nbr_list_size, 1, MPI_INT, nbr_k, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 
 
-	    // MPI-7: Send number of elements less than or equal to pivot
-	    MPI_Send(&list_size_leq, 1, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
+	    // MPI-7: Send number of elements greater than pivot
+	    MPI_Send(&list_size_gt, 1, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
 
 	    // ***** Add MPI call here *****
 
@@ -367,7 +367,7 @@ void HyperCube_Class::HyperCube_QuickSort() {
 	    // Allocate storage for neighbor's list
 	    nbr_list = new int[nbr_list_size]; 
 
-	    // MPI-8: Receive neighbor's list of elements that are greater than the pivot
+	    // MPI-8: Receive neighbor's list of elements that are less than or equal to the pivot
 	    
 
 	    // ***** Add MPI call here *****
@@ -377,16 +377,16 @@ void HyperCube_Class::HyperCube_QuickSort() {
 	    // MPI-9: Send list[0 ... idx-1] to neighbor
 
 	    // ***** Add MPI call here *****
-		MPI_Send(list, list_size_leq, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
+		MPI_Send(list, list_size_gt, MPI_INT, nbr_k, 0, MPI_COMM_WORLD);
 
-	    // Merge local list of elements greater than pivot with neighbor's list
-	    new_list = merged_list(&list[idx], list_size_gt, nbr_list, nbr_list_size); 
+	    // Merge local list of elements less than or equal to pivot with neighbor's list
+	    new_list = merged_list(&list[idx], list_size_leq, nbr_list, nbr_list_size); 
 
 	    // Replace local list with new_list, update size
 	    delete [] list; 
 	    delete [] nbr_list; 
 	    list = new_list; 
-	    list_size = list_size_gt+nbr_list_size;
+	    list_size = list_size_leq+nbr_list_size;
 	}
 	// Deallocate processor group, processor communicator, 
 	// sub_hypercube_processors array; these variables will be 
