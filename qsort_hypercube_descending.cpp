@@ -81,7 +81,7 @@ int * HyperCube_Class::merged_list(int * list1, int list1_size, int * list2, int
     int idx2 = 0; 
     int idx = 0; 
     while ((idx1 < list1_size) && (idx2 < list2_size)) {
-	if (list1[idx1] <= list2[idx2]) {
+	if (list1[idx1] > list2[idx2]) {
 	    list[idx] = list1[idx1]; 
 	    idx++; idx1++;
 	} else {
@@ -112,7 +112,7 @@ int HyperCube_Class::split_list_index (int *list, int list_size, int pivot) {
     int first, last, mid;  
     first = 0; last = list_size; mid = (first+last)/2;
     while (first < last) {
-	if (list[mid] <= pivot) {
+    if (list[mid] >= pivot) {
 	    first = mid+1; mid = (first+last)/2;
 	} else {
 	    last = mid; mid = (first+last)/2;
@@ -194,30 +194,30 @@ void HyperCube_Class::check_list() {
     int error, local_error;
     int j, my_max;
     MPI_Status status; 
-    // Receive largest list value from process with rank (my_id-1)
-    if (my_id-1 >= 0) {
-	MPI_Recv(&max_nbr, 1, MPI_INT, my_id-1, tag, MPI_COMM_WORLD, &status);
+    // Receive largest list value from process with rank (my_id+1)
+    if (my_id+1 < num_procs) {
+	MPI_Recv(&max_nbr, 1, MPI_INT, my_id+1, tag, MPI_COMM_WORLD, &status);
 	// Good practice to check status!
     }
     // Check that the local list is sorted and that elements are larger than 
-    // or equal to the largest on process with rank (my_id-1)
+    // or equal to the largest on process with rank (my_id+1)
     // (error is set to 1 if a pair of elements is not sorted correctly)
     local_error = 0;
     if (list_size > 0) {
-	if (list[0] < max_nbr) local_error = 1; 
-	for (j = 1; j < list_size; j++) {
-	    if (list[j] < list[j-1]) local_error = 1;
+	if (list[list_size-1] < max_nbr) local_error = 1; 
+	for (j = list_size -2; j >= 0; j--) {
+	    if (list[j] < list[j+1]) local_error = 1;
 	}
-	my_max = list[list_size-1];
+	my_max = list[0];
     } else {					// Modified 6-21-2017
 	my_max = max_nbr;			// Modified 6-21-2017
     }
     if (VERBOSE > 1) {
 	printf("[Proc: %0d] check_list: local_error = %d\n", my_id, local_error);
     }
-    // Send largest list value to process with rank (my_id+1)
-    if (my_id+1 < num_procs) {
-	MPI_Send(&my_max, 1, MPI_INT, my_id+1, tag, MPI_COMM_WORLD);
+    // Send largest list value to process with rank (my_id-1)
+    if (my_id-1 >= 0) {
+	MPI_Send(&my_max, 1, MPI_INT, my_id-1, tag, MPI_COMM_WORLD);
 	// Good practice to check status!
     }
     // Collect errors from all processes
@@ -304,8 +304,8 @@ void HyperCube_Class::HyperCube_QuickSort() {
 
 	// Search for smallest element in list which is larger than pivot
 	// Upon return:
-	//   list[0 ... idx-1] <= pivot
-	//   list[idx ... list_size-1] > pivot
+	//   list[0 ... idx-1] > pivot
+	//   list[idx ... list_size-1] <= pivot
 	idx = split_list_index(list, list_size, pivot);
 
 	list_size_leq = idx;
@@ -406,9 +406,9 @@ void HyperCube_Class::HyperCube_QuickSort() {
 int compare_int(const void *a0, const void *b0) {
     int a = *(int *)a0;
     int b = *(int *)b0;
-    if (a < b) {
+    if (a > b) {
 	return -1; 
-    } else if (a > b) {
+    } else if (a < b) {
 	return 1;
     } else {
 	return 0;
